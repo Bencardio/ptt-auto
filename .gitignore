@@ -1,0 +1,17 @@
+# Données patients et résultats : ne jamais publier
+resultats_site/
+site_travail/
+resultats/
+exports_segment/
+dicom/
+anciennes_versions/
+pseudonymes.csv
+identites_patients.csv
+cliniques.xlsx
+choix_series.csv
+*.dcm
+*.DCM
+.version_installee
+__pycache__/
+*.pyc
+.DS_Store

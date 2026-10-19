@@ -1,0 +1,954 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analyse PTT / PBVi</title>
+<style>
+:root{
+  --fond:#f5f6f8; --carte:#ffffff; --texte:#1d2330; --doux:#5b6475; --ligne:#dde1e8;
+  --accent:#1f6feb; --accent-doux:#e7f0ff; --ok:#1a7f37; --ok-fond:#e6f4ea;
+  --verif:#9a6700; --verif-fond:#fff4d6; --echec:#c62828; --echec-fond:#fdecea;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --fond:#14171c; --carte:#1d2128; --texte:#e6e8ec; --doux:#9aa3b2; --ligne:#2f3540;
+    --accent:#5b9dff; --accent-doux:#1c2a40; --ok:#5cc87a; --ok-fond:#183222;
+    --verif:#e3b341; --verif-fond:#3a2f12; --echec:#ff7b72; --echec-fond:#3b1a1a;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fond);color:var(--texte);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:20px 24px 8px;max-width:1200px;margin:auto}
+h1{font-size:22px;margin:0 0 4px}
+.sous{color:var(--doux);font-size:13px}
+main{max-width:1200px;margin:auto;padding:8px 24px 40px}
+.carte{background:var(--carte);border:1px solid var(--ligne);border-radius:10px;padding:18px;margin:14px 0}
+h2{font-size:16px;margin:0 0 12px}
+#zone{border:2px dashed var(--ligne);border-radius:10px;padding:34px 16px;text-align:center;transition:.15s;cursor:default}
+#zone.survol{border-color:var(--accent);background:var(--accent-doux)}
+#zone .grand{font-size:17px;font-weight:600;margin-bottom:6px}
+button,.bouton{font:inherit;border:1px solid var(--ligne);background:var(--carte);color:var(--texte);border-radius:7px;padding:7px 13px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.principal{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button:disabled{opacity:.5;cursor:not-allowed}
+.rangee{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+label.choix{display:flex;gap:6px;align-items:flex-start;margin:4px 0}
+input[type=text]{font:inherit;padding:6px 9px;border:1px solid var(--ligne);border-radius:6px;background:var(--fond);color:var(--texte)}
+input[type=number]{font:inherit;width:80px;padding:5px 7px;border:1px solid var(--ligne);border-radius:6px;background:var(--fond);color:var(--texte)}
+.puces{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.puce{background:var(--accent-doux);border-radius:20px;padding:3px 10px;font-size:13px}
+.barre{height:9px;background:var(--ligne);border-radius:5px;overflow:hidden;margin:8px 0}
+.barre>div{height:100%;background:var(--accent);width:0;transition:width .3s}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--ligne);text-align:left;vertical-align:top}
+th{color:var(--doux);font-weight:600;white-space:nowrap}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tbody tr.res{cursor:pointer}
+tbody tr.res:hover{background:var(--accent-doux)}
+tr.actif{background:var(--accent-doux)}
+.badge{display:inline-block;border-radius:5px;padding:1px 8px;font-size:12.5px;font-weight:600;white-space:nowrap}
+.b-ok{color:var(--ok);background:var(--ok-fond)}
+.b-verif{color:var(--verif);background:var(--verif-fond)}
+.b-echec{color:var(--echec);background:var(--echec-fond)}
+.b-sans{color:var(--doux);background:var(--fond);border:1px solid var(--ligne)}
+.alertes{color:var(--doux);font-size:12.5px;max-width:380px}
+.defile{overflow-x:auto}
+#detail img{max-width:100%;border:1px solid var(--ligne);border-radius:8px;background:#fff}
+.message{background:var(--fond);border-radius:6px;padding:8px 10px;font-size:13px;margin:8px 0}
+.erreur{color:var(--echec);font-weight:600}
+.cache{display:none!important}
+kbd{font:12px ui-monospace,monospace;border:1px solid var(--ligne);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--fond)}
+td.validation{white-space:nowrap;cursor:default}
+label.valid{font-size:12.5px;margin-right:4px;cursor:pointer}
+tr.ligneDetail>td{padding:0 0 4px;background:var(--fond)}
+tr.ligneDetail #detail{position:sticky;left:0;margin:6px 0 10px;box-shadow:0 2px 10px rgba(0,0,0,.12)}
+tr.res.actif td:first-child b::before{content:"▾ "}
+tr.res td:first-child b::before{content:"▸ ";color:var(--doux)}
+tr.res td:first-child{white-space:nowrap}
+.roiZone{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;align-items:flex-start}
+.roiZone canvas{max-width:100%;border:1px solid var(--ligne);border-radius:8px;background:#000}
+#roiImg{cursor:crosshair;touch-action:none}
+#roiCourbes{background:var(--carte)!important}
+input[type=range]{width:220px}
+select{font:inherit;padding:5px 7px;border:1px solid var(--ligne);border-radius:6px;background:var(--fond);color:var(--texte)}
+details summary{cursor:pointer;color:var(--accent)}
+.resume{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;margin-bottom:8px}
+small{color:var(--doux)}
+@media (max-width:640px){header,main{padding-left:16px;padding-right:16px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Analyse PTT / PBVi – IRM cardiaque</h1>
+  <div class="sous">Site local : les images restent sur cet ordinateur. Calculs de <code>ptt_pipeline.py</code> (perfusion) et <code>bolustrak_ptt.py</code> (2D BolusTrak). Outil de recherche, non destiné au diagnostic.</div>
+</header>
+<main>
+
+<section class="carte cache" id="anciens">
+  <h2>Reprendre une analyse précédente</h2>
+  <div class="defile"><table><thead><tr><th>Enregistrée le</th><th>Type</th><th>Patients</th><th>Encore « à vérifier »</th><th>Dossier de résultats</th><th></th></tr></thead>
+    <tbody id="listeLots"></tbody></table></div>
+  <small>Résultats, validations ok / échec et ROI dessinées à la main sont retrouvés. Pour relancer un patient, ses fichiers DICOM doivent être toujours au même endroit.</small>
+</section>
+
+<section class="carte" id="etape1">
+  <h2>1. Type d'analyse et DICOM</h2>
+  <div class="rangee" style="margin:0 0 10px;padding-bottom:10px;border-bottom:1px solid var(--ligne)">
+    <label class="choix"><input type="radio" name="analyse" value="perfusion" checked>
+      <span><b>Perfusion de premier passage</b> : PTT VD → VG (pic à pic), PTTc, PBVi</span></label>
+    <label class="choix"><input type="radio" name="analyse" value="bolustrak">
+      <span><b>2D BolusTrak</b> : transit AP → VG/aorte (pied, pente max, pic si atteint)</span></label>
+    <label class="choix"><input type="radio" name="analyse" value="segment">
+      <span><b>Courbes (Segment ou sauvegardées)</b> : PTT, PTTc, LMH recalculés sans les DICOM, à partir des courbes enregistrées par ce programme (dossier <code>courbes</code>) ou des exports « ROI Analysis » de Segment (.txt, un par patient, ou classeur Excel, un onglet par patient)</span></label>
+    <small id="noteSegment" class="cache">Aussi pour refaire les calculs sans les DICOM : déposez les fichiers du dossier <code>courbes</code> d'une analyse de perfusion (même fenêtre et même RR, résultats identiques). Un fichier .txt = un patient, nommé comme le fichier (ex. CMH-012.txt). Classeur Excel (.xlsx) : un onglet par patient, nommé avec son code ; dans chaque onglet, une colonne « Temps (s) » (ou Time [ms]) puis une colonne VD (ou RV) et une colonne VG (ou LV). Chaque export doit contenir une ROI VD (RV) et une ROI VG (LV). Résultats à part (resultats_PTT_segment.csv). Le RR est pris dans le fichier clinique, sinon dans une analyse de perfusion du même patient faite sur ce PC.
+      <br><label>Intervalle réel entre images (s) : <input type="text" id="intervalleSeg" size="6" placeholder="auto"></label>
+      utilisé quand le temps exporté par Segment est inutilisable (pas de quelques ms par image). Vide = repris de l'analyse de perfusion du même patient (version 1.4.5 ou plus), sinon 1 image par battement supposée.</small>
+    <small id="noteBolus" class="cache">Mesure différente du PTT de perfusion, non validée comme équivalente : résultats enregistrés à part (resultats_bolustrak.csv), ne pas les mélanger.</small>
+  </div>
+  <div class="rangee" style="margin:0 0 6px" id="ligneModeDossier">
+    <label class="choix"><input type="radio" name="mode" value="dossier" checked>
+      <span>Un dossier = <b>un patient</b> (les sous-dossiers sont ses séries)</span></label>
+    <label class="choix"><input type="radio" name="mode" value="parent">
+      <span>Le dossier contient <b>un sous-dossier par patient</b> (ex. le dossier <code>dicom</code> du projet)</span></label>
+  </div>
+  <div class="rangee" style="margin:4px 0 14px">
+    <button class="principal" id="btnNatif">Choisir un dossier sur ce PC et analyser</button>
+    <small>Le plus rapide : les fichiers sont lus sur place, sans copie.</small>
+  </div>
+  <div id="zone">
+    <div class="grand" id="texteZone">… ou glissez ici un ou plusieurs dossiers patients</div>
+    <div class="sous" id="sousZone">(ou des fichiers DICOM isolés d'un même patient)</div>
+    <div class="rangee" style="justify-content:center">
+      <button id="btnDossier">Parcourir un dossier…</button>
+      <button id="btnFichiers">Choisir des fichiers…</button>
+    </div>
+    <input type="file" id="inDossier" webkitdirectory directory multiple class="cache">
+    <input type="file" id="inFichiers" multiple class="cache">
+  </div>
+
+  <div id="regroupement" class="cache" style="margin-top:14px">
+    <div id="ligneNomLibre" class="rangee cache">
+      <span>Code du patient pour les fichiers isolés :</span>
+      <input type="text" id="nomLibre" value="patient_1" size="14">
+    </div>
+    <div id="apercu" class="puces"></div>
+    <div class="rangee">
+      <button class="principal" id="btnEnvoyer">Envoyer et analyser</button>
+      <button id="btnVider">Vider la sélection</button>
+      <small id="infoFichiers"></small>
+    </div>
+  </div>
+
+  <details style="margin-top:16px">
+    <summary>Options : fichier clinique (PBVi), préfixe des codes, cohorte entière</summary>
+    <div style="margin-top:10px">
+      <b>Fichier clinique</b> (facultatif, pour le PBVi) : <code>cliniques.xlsx</code> ou <code>.csv</code> avec les colonnes
+      ID, Taille_cm, Poids_kg, VES_VD_mL, VES_VG_mL, FC (comme décrit dans le guide).
+      <div class="rangee">
+        <input type="file" id="inClinique" accept=".xlsx,.xls,.csv">
+        <small id="infoClinique"></small>
+      </div>
+    </div>
+    <div style="margin-top:16px">
+      <b>Préfixe des codes pseudonymes</b> : chaque patient reçoit un code stable (préfixe + numéro, ex. PTT-IMM-001),
+      dans la colonne <code>code_pseudo</code>. Chaque préfixe a sa propre numérotation.
+      <div class="rangee">
+        <input type="text" id="prefixe" maxlength="20" style="width:140px" placeholder="PTT-">
+        <button id="btnPrefixe">Appliquer</button>
+        <small id="infoPrefixe">Gardé pour les analyses suivantes ; appliqué aussi aux patients de l'analyse affichée.</small>
+      </div>
+    </div>
+    <div style="margin-top:16px">
+      <b>Cohorte entière déjà sur ce PC</b> : plutôt que de glisser des centaines de patients, collez le chemin du dossier
+      qui contient un sous-dossier par patient (rien n'est copié).
+      <div class="rangee">
+        <input type="text" id="chemin" placeholder="D:\PTT_projet\dicom" size="40">
+        <button id="btnChemin">Analyser ce dossier</button>
+      </div>
+    </div>
+  </details>
+</section>
+
+<section class="carte cache" id="progression">
+  <h2 id="titreProgression">Analyse</h2>
+  <div class="barre"><div id="barre"></div></div>
+  <div id="texteProgression" class="sous"></div>
+</section>
+
+<section class="carte cache" id="resultats">
+  <h2 id="titreResultats">2. Résultats</h2>
+  <div class="resume" id="resume"></div>
+  <div class="rangee" style="margin:0 0 10px">
+    <button id="expCsv">Télécharger CSV</button>
+    <button id="expXlsx">Télécharger Excel</button>
+    <button id="expIdentites" title="Nom, prénom, identifiant, date de naissance et date d'examen de chaque patient (données nominatives : ne pas sortir de l'hôpital)">Identités des patients (CSV)</button>
+    <button id="expZip">Tout (CSV + images de contrôle, .zip)</button>
+    <button id="btnReprendre" title="Relance seulement les échecs">Relancer les échecs</button>
+    <span style="flex:1"></span>
+    <label class="choix" style="margin:0"><input type="checkbox" id="filtreVerif"> afficher seulement les patients à traiter (« à vérifier » non validés et « échec »)</label>
+  </div>
+  <div class="defile"><table>
+    <thead id="entete"><tr><th>Patient</th><th title="Présence d'une série au nom de perfusion (1 = oui, 0 = non)">Perfusion</th><th>Statut</th><th>PTT pic (s)</th><th>PTT centroïde (s)</th><th>PTTc pic</th>
+      <th>PBVi VD (mL/m²)</th><th>PBVi VG (mL/m²)</th><th>RR (ms)</th><th>Série / coupe</th><th>Alertes / message</th></tr></thead>
+    <tbody id="corps"></tbody>
+  </table></div>
+  <small>Cliquez sur un patient pour ouvrir, juste en dessous, son image de contrôle, ses séries et l'éditeur de ROI ; cliquez à nouveau pour refermer.</small><br>
+  <small><b>Clavier :</b> <kbd>→</kbd> ou <kbd>N</kbd> patient « à vérifier » suivant, <kbd>←</kbd> ou <kbd>P</kbd> précédent, <kbd>O</kbd> = ok, <kbd>E</kbd> = échec (puis passage au suivant), <kbd>Échap</kbd> = fermer le panneau.</small> <small id="infoClavier" class="erreur"></small>
+  <div class="rangee" style="margin-top:6px"><small id="dossierRes"></small></div>
+</section>
+
+<section class="carte cache" id="detail"></section>
+
+<section class="rangee" style="margin-top:4px">
+  <button id="btnNouveau">Nouvelle analyse</button>
+  <button id="btnEffacer" title="Supprime les copies des DICOM déposés ; les résultats sont conservés">Effacer les copies DICOM de cette analyse</button>
+</section>
+</main>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+let DETAIL = null;   // panneau du patient : déplacé sous la ligne cliquée
+const H = {"X-Site-PTT": "1"};
+let lot = null, enAttente = [], etat = null, patientActif = null, minuterie = null, fichierClinique = null;
+
+const IGNORES = /^(\.|thumbs\.db$|desktop\.ini$)/i;
+
+function nb(v, d = 2) {
+  if (v === null || v === undefined || v === "" || Number.isNaN(Number(v))) return "–";
+  return Number(v).toLocaleString("fr-FR", {minimumFractionDigits: d, maximumFractionDigits: d});
+}
+function esc(t) { return String(t ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function badge(s) {
+  const c = s === "ok" ? "b-ok" : s === "à vérifier" ? "b-verif" : (s === "sans perfusion" || s === "sans BolusTrak") ? "b-sans" : "b-echec";
+  return `<span class="badge ${c}">${esc(s)}</span>`;
+}
+
+async function api(chemin, corps, brut) {
+  const opt = {method: corps === undefined ? "GET" : "POST", headers: {...H}};
+  if (corps !== undefined) {
+    if (brut) opt.body = corps; else { opt.body = JSON.stringify(corps); opt.headers["Content-Type"] = "application/json"; }
+  }
+  const r = await fetch(chemin, opt);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.erreur || ("erreur " + r.status));
+  return j;
+}
+
+async function nouveauLot() {
+  const j = await api("/api/nouveau", {mode: modeAnalyse()});
+  lot = j.lot; etat = null; patientActif = null;
+  if (j.prefixe) $("#prefixe").value = j.prefixe;
+  $("#resultats").classList.add("cache"); (DETAIL || $("#detail")).classList.add("cache");
+  $("#progression").classList.add("cache");
+  if (fichierClinique) await envoyerClinique(fichierClinique);   // garde le fichier clinique d'une analyse à l'autre
+}
+
+function modeAnalyse() { return document.querySelector('input[name=analyse]:checked').value; }
+let modePrecedent = "perfusion";
+document.querySelectorAll('input[name=analyse]').forEach(r => r.onchange = async () => {
+  if (etat && etat.etat === "en_cours") {
+    document.querySelector(`input[name=analyse][value=${modePrecedent}]`).checked = true;
+    return alert("Attendez la fin de l'analyse en cours avant de changer de type d'analyse.");
+  }
+  modePrecedent = modeAnalyse();
+  majTypeAnalyse(modePrecedent);
+  try { await nouveauLot(); } catch (e) {
+    alert(e.message);
+    document.querySelector('input[name=analyse][value=perfusion]').checked = true; modePrecedent = "perfusion";
+    majTypeAnalyse("perfusion");
+  }
+});
+function majTypeAnalyse(m) {
+  const seg = m === "segment";
+  $("#noteBolus").classList.toggle("cache", m !== "bolustrak");
+  $("#noteSegment").classList.toggle("cache", !seg);
+  $("#ligneModeDossier").classList.toggle("cache", seg);
+  $("#texteZone").textContent = seg ? "… ou glissez ici les exports Segment (.txt ou classeur Excel), ou le dossier qui les contient"
+                                    : "… ou glissez ici un ou plusieurs dossiers patients";
+  $("#sousZone").textContent = seg ? "(un fichier .txt par patient, ou un classeur avec un onglet par patient)" : "(ou des fichiers DICOM isolés d'un même patient)";
+  $("#btnNatif").textContent = seg ? "Choisir le dossier des exports sur ce PC et analyser" : "Choisir un dossier sur ce PC et analyser";
+  if (typeof apercu === "function") apercu();
+}
+
+/* ---------- colonnes du tableau selon le type d'analyse ---------- */
+const oui = v => v === 1 ? "oui" : v === 0 ? "non" : "–";
+// cases « ok » / « échec » pour trancher un patient « à vérifier » après relecture
+const VALIDATION = ["Validation", x => (x.statut_auto === "à vérifier" || x.statut === "à vérifier" || x.validation_manuelle) ?
+  ["ok", "échec"].map(v => `<label class="valid"><input type="checkbox" class="valider" data-id="${esc(x.ID)}" value="${v}" ${x.validation_manuelle === v ? "checked" : ""}> ${v}</label>`).join(" ") : "",
+  "validation", "Pour les patients « à vérifier » : cochez ok (résultat retenu) ou échec (patient exclu). Le statut est remplacé (aussi dans le CSV) ; le statut d'origine reste dans la colonne statut_auto. Une relance du patient efface la validation."];
+const COLONNES = {
+  perfusion: [
+    ["Perfusion", x => x.presence_sequence_perfusion ?? "–", "n", "Présence d'une série au nom de perfusion (1 = oui, 0 = non)"],
+    ["Statut", x => badge(x.statut)], VALIDATION,
+    ["PTT pic (s)", x => nb(x.PTT_pic_s), "n"], ["PTT centroïde (s)", x => nb(x.PTT_centroide_s), "n"],
+    ["PTTc pic (cycles)", x => nb(x.PTTc_pic), "n", "PTT pic normalisé au cycle cardiaque : PTT / RR = PTT × FC / 60 (nombre de battements)"],
+    ["PTTc centroïde (cycles)", x => nb(x.PTTc_centroide), "n", "PTT centroïde normalisé au cycle cardiaque : PTT / RR = PTT × FC / 60 (nombre de battements)"],
+    ["PTT Bazett pic", x => nb(x.PTT_bazett_pic), "n", "PTT pic corrigé de la FC (Bazett) : PTT / √RR (RR en s)"],
+    ["PTT Bazett centroïde", x => nb(x.PTT_bazett_centroide), "n", "PTT centroïde corrigé de la FC (Bazett) : PTT / √RR (RR en s)"], ["PBVi VD (mL/m²)", x => nb(x.PBVi_VD_pic_mL_m2, 1), "n"],
+    ["PBVi VG (mL/m²)", x => nb(x.PBVi_VG_pic_mL_m2, 1), "n"], ["FC (bpm)", x => nb(x.FC_bpm ?? (x.RR_ms ? 60000 / x.RR_ms : null), 0), "n", "Fréquence cardiaque de l'examen (en-tête DICOM HeartRate ou NominalInterval, sinon fichier clinique) ; RR dans le CSV"],
+    ["Écart centroïde − pic (s)", x => nb(x.ecart_centroide_pic_s), "n", "PTT centroïde − PTT pic (alerte au-delà de ±1,5 s)"],
+    ["LMH VD (s)", x => nb(x.LMH_VD_s), "n", "Largeur à mi-hauteur de la courbe VD"], ["LMH VG (s)", x => nb(x.LMH_VG_s), "n", "Largeur à mi-hauteur de la courbe VG"],
+    ["VG/VD largeur", x => x.rapport_LMH_VG_VD == null ? "–" : (x.dispersion_VG ? `<b title="${esc(x.dispersion_VG)}">${nb(x.rapport_LMH_VG_VD)} étalé</b>` : nb(x.rapport_LMH_VG_VD)), "n",
+      "Rapport des largeurs à mi-hauteur VG / VD (dispersion du bolus dans les poumons). « étalé » = courbes propres et rapport ≥ seuil (RAPPORT_LMH_ETALE) : un écart centroïde-pic est alors plutôt physiologique (congestion, bas débit) qu'une erreur"],
+    ["Série / coupe", x => `${x.serie_num ?? "–"} / ${x.coupe_retenue ?? "–"}`, "n"],
+  ],
+  segment: [
+    ["Statut", x => badge(x.statut)], VALIDATION,
+    ["PTT pic (s)", x => nb(x.PTT_pic_s), "n"], ["PTT centroïde (s)", x => nb(x.PTT_centroide_s), "n"],
+    ["PTTc pic (cycles)", x => nb(x.PTTc_pic), "n", "PTT pic normalisé au cycle cardiaque : PTT / RR (nombre de battements)"],
+    ["PTTc centroïde (cycles)", x => nb(x.PTTc_centroide), "n", "PTT centroïde normalisé au cycle cardiaque : PTT / RR (nombre de battements)"],
+    ["PTT Bazett pic", x => nb(x.PTT_bazett_pic), "n"], ["PTT Bazett centroïde", x => nb(x.PTT_bazett_centroide), "n"],
+    ["LMH VD (s)", x => nb(x.LMH_VD_s), "n", "Largeur à mi-hauteur de la courbe VD"], ["LMH VG (s)", x => nb(x.LMH_VG_s), "n", "Largeur à mi-hauteur de la courbe VG"],
+    ["Écart centroïde − pic (s)", x => nb(x.ecart_centroide_pic_s), "n", "PTT centroïde − PTT pic (alerte au-delà de ±1,5 s)"],
+    ["VG/VD largeur", x => x.rapport_LMH_VG_VD == null ? "–" : (x.dispersion_VG ? `<b title="${esc(x.dispersion_VG)}">${nb(x.rapport_LMH_VG_VD)} étalé</b>` : nb(x.rapport_LMH_VG_VD)), "n"],
+    ["PBVi VD (mL/m²)", x => nb(x.PBVi_VD_pic_mL_m2, 1), "n"],
+    ["FC (bpm)", x => nb(x.FC_bpm, 0), "n", "Source du RR dans le CSV (source_RR)"],
+  ],
+  bolustrak: [
+    ["Statut", x => badge(x.statut)], VALIDATION,
+    ["Transit pied (s)", x => nb(x.PTT_pied_s), "n", "Arrivée du bolus : VG/aorte moins AP/cœur droit"],
+    ["Transit pente max (s)", x => nb(x.PTT_pente_s), "n"], ["Transit pic (s)", x => nb(x.PTT_pic_s), "n", "Seulement si le pic est atteint dans les deux régions"],
+    ["Pente VG atteinte", x => oui(x.pente_VG_atteinte)], ["Pic VG atteint", x => oui(x.pic_VG_atteint)],
+    ["Durée série (s)", x => nb(x.duree_serie_s, 1), "n"], ["Image toutes les (s)", x => nb(x.intervalle_images_s), "n"],
+    ["Série", x => x.serie_num ?? "–", "n"],
+  ],
+};
+
+/* ---------- collecte des fichiers (glisser-déposer, dossiers inclus) ---------- */
+function lireEntrees(lecteur) {
+  return new Promise((ok, ko) => {
+    const tout = [];
+    const suite = () => lecteur.readEntries(lot => { if (!lot.length) ok(tout); else { tout.push(...lot); suite(); } }, ko);
+    suite();
+  });
+}
+async function parcourir(entree, sortie) {
+  if (IGNORES.test(entree.name)) return;
+  if (entree.isFile) {
+    const f = await new Promise((ok, ko) => entree.file(ok, ko));
+    sortie.push({fichier: f, chemin: entree.fullPath.replace(/^\/+/, "")});
+  } else if (entree.isDirectory) {
+    for (const e of await lireEntrees(entree.createReader())) await parcourir(e, sortie);
+  }
+}
+
+const zone = $("#zone");
+["dragenter", "dragover"].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.add("survol"); }));
+["dragleave", "drop"].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.remove("survol"); }));
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => e.preventDefault());
+zone.addEventListener("drop", async e => {
+  const entrees = [...e.dataTransfer.items].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  $("#infoFichiers").textContent = "Lecture du contenu…";
+  const liste = [];
+  for (const en of entrees) await parcourir(en, liste);
+  ajouter(liste);
+});
+$("#btnDossier").onclick = () => $("#inDossier").click();
+$("#btnFichiers").onclick = () => $("#inFichiers").click();
+$("#inDossier").onchange = e => { ajouter([...e.target.files].map(f => ({fichier: f, chemin: f.webkitRelativePath || f.name}))); e.target.value = ""; };
+$("#inFichiers").onchange = e => { ajouter([...e.target.files].map(f => ({fichier: f, chemin: f.name}))); e.target.value = ""; };
+
+function ajouter(liste) {
+  liste = liste.filter(x => !x.chemin.split("/").some(p => IGNORES.test(p)));
+  enAttente.push(...liste);
+  const hauts = new Set(enAttente.filter(x => x.chemin.includes("/")).map(x => x.chemin.split("/")[0]));
+  // dossier « dicom » du projet déposé tel quel : un sous-dossier par patient
+  if (hauts.size === 1 && [...hauts][0].toLowerCase() === "dicom") document.querySelector('input[value=parent]').checked = true;
+  apercu();
+}
+
+function mode() { return document.querySelector('input[name=mode]:checked').value; }
+function grouper() {
+  const m = mode(), libre = $("#nomLibre").value.trim() || "patient_1";
+  if (modeAnalyse() === "segment")   // un export .txt = un patient, nommé comme le fichier
+    return enAttente.filter(x => /\.(txt|xlsx|xlsm)$/i.test(x.chemin) && !/(^|\/)~\$/.test(x.chemin)).map(x => {
+      const nomf = x.chemin.split("/").pop();   // classeur Excel : le serveur crée un patient par onglet
+      return {...x, pid: nomf.replace(/\.(txt|xlsx|xlsm)$/i, ""), rel: nomf};
+    });
+  return enAttente.map(x => {
+    const p = x.chemin.split("/");
+    let pid, rel;
+    if (p.length === 1) { pid = libre; rel = p; }
+    else if (m === "parent" && p.length > 2) { pid = p[1]; rel = p.slice(2); }
+    else { pid = p[0]; rel = p.slice(1); }
+    return {...x, pid, rel: rel.join("/")};
+  });
+}
+function apercu() {
+  const g = grouper(), compte = {};
+  g.forEach(x => compte[x.pid] = (compte[x.pid] || 0) + 1);
+  const ids = Object.keys(compte).sort();
+  $("#regroupement").classList.toggle("cache", !enAttente.length);
+  $("#ligneNomLibre").classList.toggle("cache", modeAnalyse() === "segment" || !enAttente.some(x => !x.chemin.includes("/")));
+  $("#apercu").innerHTML = ids.slice(0, 60).map(i => `<span class="puce">${esc(i)} · ${compte[i]} fichiers</span>`).join("")
+    + (ids.length > 60 ? `<span class="puce">… et ${ids.length - 60} autres</span>` : "");
+  const mo = enAttente.reduce((s, x) => s + x.fichier.size, 0) / 1048576;
+  $("#infoFichiers").textContent = `${ids.length} patient(s), ${g.length} fichiers, ${nb(mo, 0)} Mo`
+    + (g.length < enAttente.length ? ` (${enAttente.length - g.length} fichier(s) ni .txt ni Excel ignoré(s))` : "");
+}
+document.querySelectorAll('input[name=mode]').forEach(r => r.onchange = apercu);
+$("#nomLibre").oninput = apercu;
+$("#btnVider").onclick = () => { enAttente = []; apercu(); };
+
+/* ---------- envoi puis analyse ---------- */
+$("#btnEnvoyer").onclick = async () => {
+  const g = grouper();
+  if (!g.length) return;
+  if (etat && etat.etat === "en_cours") return alert("Une analyse est en cours.");
+  if (etat && etat.resultats.length) await nouveauLot();
+  $("#btnEnvoyer").disabled = true;
+  // paquets de 200 fichiers / 32 Mo au plus : une requête par paquet, pas par fichier
+  const paquets = [];
+  let cour = [], taille = 0;
+  for (const x of g) {
+    if (cour.length && (cour.length >= 200 || taille + x.fichier.size > 32 * 1048576)) { paquets.push(cour); cour = []; taille = 0; }
+    cour.push(x); taille += x.fichier.size;
+  }
+  if (cour.length) paquets.push(cour);
+  const t0 = Date.now();
+  montrerProgression("Copie des fichiers dans le dossier de travail", 0, g.length);
+  let fait = 0, echecs = 0, i = 0;
+  const travailleur = async () => {
+    while (i < paquets.length) {
+      const pq = paquets[i++];
+      const entete = encodeURIComponent(JSON.stringify(pq.map(x => [x.pid, x.rel, x.fichier.size])));
+      try {
+        const r = await fetch(`/api/fichiers?lot=${lot}`, {method: "POST", headers: {...H, "X-Fichiers": entete},
+                                                            body: new Blob(pq.map(x => x.fichier))});
+        if (!r.ok) echecs += pq.length;
+      } catch (e) { echecs += pq.length; }
+      fait += pq.length;
+      const s = (Date.now() - t0) / 1000;
+      montrerProgression("Copie des fichiers dans le dossier de travail", fait, g.length,
+        `${fait} / ${g.length} fichiers · ${Math.round(s)} s` + (fait < g.length && fait ? ` · reste environ ${Math.round(s / fait * (g.length - fait))} s` : ""));
+    }
+  };
+  await Promise.all(Array.from({length: 3}, travailleur));
+  enAttente = []; apercu();
+  $("#btnEnvoyer").disabled = false;
+  if (echecs) alert(`${echecs} fichier(s) n'ont pas pu être copiés.`);
+  analyser({});
+};
+
+$("#btnNatif").onclick = async () => {
+  if (etat && etat.etat === "en_cours") return alert("Une analyse est en cours.");
+  $("#btnNatif").disabled = true;
+  try {
+    const {chemin, erreur} = await api("/api/choisir_dossier", {lot});
+    if (erreur) { $("details").open = true; return alert(erreur + " : collez le chemin du dossier dans « Options », champ « Cohorte entière ».") }
+    if (!chemin) return;
+    if (etat && etat.resultats.length) await nouveauLot();
+    await api("/api/dossier_local", {lot, chemin, un_seul_patient: mode() === "dossier"});
+    analyser({});
+  } catch (e) { alert(e.message); }
+  finally { $("#btnNatif").disabled = false; }
+};
+
+$("#btnChemin").onclick = async () => {
+  try {
+    if (etat && etat.resultats.length) await nouveauLot();
+    const j = await api("/api/dossier_local", {lot, chemin: $("#chemin").value});
+    analyser({});
+  } catch (e) { alert(e.message); }
+};
+
+async function envoyerClinique(f) {
+  try {
+    const j = await api(`/api/clinique?lot=${lot}&nom=${encodeURIComponent(f.name)}`, f, true);
+    fichierClinique = f;
+    $("#infoClinique").textContent = `${f.name} : ${j.n_patients} patient(s) lus. Le PBVi sera calculé à la prochaine analyse.`;
+  } catch (er) { fichierClinique = null; $("#infoClinique").innerHTML = `<span class="erreur">${esc(er.message)}</span>`; }
+}
+$("#btnPrefixe").onclick = async () => {
+  try {
+    const j = await api("/api/prefixe", {lot, prefixe: $("#prefixe").value.trim()});
+    $("#prefixe").value = j.prefixe;
+    $("#infoPrefixe").textContent = `Préfixe ${j.prefixe} enregistré` + (etat && etat.resultats.length ? " et appliqué aux patients affichés." : ".");
+    if (etat && etat.resultats.length) { etat = await api(`/api/etat?lot=${lot}`); signatureDetail = signatureTableau = ""; afficher(); }
+  } catch (e) { $("#infoPrefixe").innerHTML = `<span class="erreur">${esc(e.message)}</span>`; }
+};
+$("#prefixe").onkeydown = e => { if (e.key === "Enter") $("#btnPrefixe").click(); };
+$("#inClinique").onchange = e => { if (e.target.files[0]) envoyerClinique(e.target.files[0]); };
+
+async function relancer(corps) {
+  ["#btnRelancer", "#btnAuto"].forEach(b => $(b).disabled = true);
+  $("#btnRelancer").textContent = etat && etat.etat === "en_cours"
+    ? "Relance en cours (l'analyse des autres patients continue)…" : "Relance en cours…";
+  await analyser(corps);
+}
+
+async function analyser(corps) {
+  if (modeAnalyse() === "segment" && !("intervalle_s" in corps)) corps = {...corps, intervalle_s: $("#intervalleSeg").value};
+  try { await api("/api/analyser", {lot, ...corps}); }
+  catch (e) { alert(e.message); signatureDetail = signatureTableau = ""; afficher(); return; }
+  suivre();
+}
+
+function montrerProgression(titre, fait, total, texte) {
+  $("#progression").classList.remove("cache");
+  $("#titreProgression").textContent = titre;
+  $("#barre").style.width = (total ? 100 * fait / total : 0) + "%";
+  $("#texteProgression").textContent = texte || `${fait} / ${total}`;
+}
+
+function suivre() {
+  clearTimeout(minuterie);
+  const tour = async () => {
+    try { etat = await api(`/api/etat?lot=${lot}`); } catch (e) { return; }
+    if (etat.etat === "en_cours") {
+      const reste = etat.fait ? Math.round(etat.duree_s / etat.fait * (etat.a_faire - etat.fait) / 60) : null;
+      montrerProgression("Analyse en cours", etat.fait, etat.a_faire,
+        `${etat.fait} / ${etat.a_faire} patient(s)` + (etat.en_cours ? ` · en cours : ${etat.en_cours}` : "")
+        + (etat.etape ? ` (${etat.etape}, ${Math.round(etat.duree_s)} s)` : "")
+        + (etat.relance ? ` · relance manuelle : ${etat.relance}` : "")
+        + (reste !== null ? ` · reste environ ${reste} min` : ""));
+      minuterie = setTimeout(tour, 1000);
+    } else if (etat.etat === "termine") {
+      montrerProgression("Analyse terminée", 1, 1, `${etat.a_faire} analyse(s) faite(s) en ${Math.max(1, Math.round(etat.duree_s))} s`
+        + (etat.envoi_s !== null ? ` · copie préalable : ${etat.envoi_mo} Mo en ${Math.round(etat.envoi_s)} s` : ""));
+    }
+    afficher();
+  };
+  tour();
+}
+
+/* ---------- résultats ---------- */
+// Pendant l'analyse, le tableau est rafraîchi chaque seconde. Rien n'est
+// redessiné tant qu'on saisit ou qu'on fait glisser quelque chose dans le
+// panneau du patient (coupe, série, ROI, fenêtre, commentaire...) : on peut
+// tout modifier pendant que l'analyse continue.
+let appuiPanneau = false, afficherEnAttente = false;
+document.addEventListener("pointerdown", e => { appuiPanneau = !!(DETAIL && DETAIL.contains(e.target)); }, true);
+const finAppui = () => { if (!appuiPanneau) return; appuiPanneau = false;
+  if (afficherEnAttente) { afficherEnAttente = false; setTimeout(afficher, 0); } };
+document.addEventListener("pointerup", finAppui, true);
+document.addEventListener("pointercancel", finAppui, true);
+function saisieEnCours() {
+  if (appuiPanneau) return true;
+  const a = document.activeElement;
+  if (!DETAIL || !a || !DETAIL.contains(a)) return false;
+  return a.tagName === "SELECT" || a.tagName === "TEXTAREA"
+    || (a.tagName === "INPUT" && ["text", "number", "range", "search"].includes(a.type));
+}
+let signatureTableau = "";
+function afficher() {
+  if (!etat || !etat.resultats.length) return;
+  if (saisieEnCours()) {
+    afficherEnAttente = true;
+    const a = document.activeElement;
+    if (a && DETAIL.contains(a) && !a.dataset.attente) {
+      a.dataset.attente = "1";
+      a.addEventListener("blur", () => { delete a.dataset.attente;
+        if (afficherEnAttente) { afficherEnAttente = false; setTimeout(afficher, 0); } }, {once: true});
+    }
+    return;
+  }
+  afficherEnAttente = false;
+  // tableau identique (aucun nouveau résultat) : on ne le redessine pas, le
+  // panneau du patient reste tel quel (série cochée, coupe saisie, éditeur...)
+  const sigT = JSON.stringify([etat.mode, etat.clinique, etat.resultats, patientActif, $("#filtreVerif").checked]);
+  if (sigT === signatureTableau && DETAIL && document.body.contains(DETAIL)) { detail(); return; }
+  signatureTableau = sigT;
+  $("#resultats").classList.remove("cache");
+  const bolus = etat.mode === "bolustrak", cols = COLONNES[etat.mode] || COLONNES.perfusion;
+  $("#titreResultats").textContent = bolus ? "2. Résultats 2D BolusTrak (transit AP → VG/aorte)"
+    : etat.mode === "segment" ? "2. Résultats sur courbes Segment (PTT VD → VG)" : "2. Résultats perfusion (PTT VD → VG)";
+  const r = etat.resultats, c = s => r.filter(x => x.statut === s).length;
+  const statuts = ["ok", "à vérifier", "échec", ...new Set(r.map(x => x.statut).filter(s => !["ok", "à vérifier", "échec"].includes(s)))];
+  $("#resume").innerHTML = `<span>${r.length} patient(s)</span>` + statuts.map(s => `${badge(s)} ${c(s)}`).join(" ")
+    + (bolus ? "" : etat.clinique ? `<small>Fichier clinique : ${esc(etat.clinique)}</small>` : `<small>Pas de fichier clinique : PBVi non calculé</small>`);
+  $("#entete").innerHTML = "<tr><th>Patient</th>" + cols.map(k => `<th${k[3] ? ` title="${esc(k[3])}"` : ""}>${k[0]}</th>`).join("") + "<th>Alertes / message</th></tr>";
+  const filtre = $("#filtreVerif").checked;
+  const nv = v => r.filter(x => x.validation_manuelle === v).length;
+  if (nv("ok") || nv("échec")) $("#resume").innerHTML += `<small>Validés à la main : ${nv("ok")} ok, ${nv("échec")} exclu(s)</small>`;
+  $("#corps").innerHTML = r.filter(x => !filtre || (x.statut !== "ok" && !x.validation_manuelle)).map(x => `
+    <tr class="res ${x.ID === patientActif ? "actif" : ""}" data-id="${esc(x.ID)}">
+      <td><b>${esc(x.ID)}</b>${x.code_pseudo ? ` <small>${esc(x.code_pseudo)}</small>` : ""}</td>${cols.map(k => `<td${k[2] ? ` class="${k[2]}"` : ""}>${k[1](x)}</td>`).join("")}
+      <td class="alertes">${x.commentaire ? `<b>Commentaire :</b> ${esc(x.commentaire)}<br>` : ""}${esc(x.alertes || (x.statut !== "ok" && x.statut !== "à vérifier" ? x.message : ""))}</td>
+    </tr>`).join("");
+  document.querySelectorAll("td.validation").forEach(td => td.onclick = e => e.stopPropagation());
+  document.querySelectorAll("input.valider").forEach(cb => cb.onchange = () => { cb.blur(); valider(cb.dataset.id, cb.checked ? cb.value : ""); });
+  document.querySelectorAll("tr.res").forEach(tr => tr.onclick = () => {
+    patientActif = patientActif === tr.dataset.id ? null : tr.dataset.id;   // 2e clic = fermer
+    afficher();
+  });
+  // le panneau s'ouvre juste sous la ligne cliquée (le même élément est déplacé :
+  // série cochée, éditeur de ROI, etc. sont conservés)
+  DETAIL = DETAIL || $("#detail");
+  const trActif = [...document.querySelectorAll("tr.res")].find(t => t.dataset.id === patientActif);
+  if (trActif) {
+    const l = document.createElement("tr"), td = document.createElement("td");
+    l.className = "ligneDetail"; td.colSpan = cols.length + 2;
+    td.appendChild(DETAIL); l.appendChild(td); trActif.after(l);
+    DETAIL.style.maxWidth = ($("#resultats .defile").clientWidth - 2) + "px";
+  } else {
+    $("#resultats").after(DETAIL);
+  }
+  $("#dossierRes").textContent = "Enregistré automatiquement dans : " + etat.dossier_resultats;
+  detail();
+}
+$("#filtreVerif").onchange = afficher;
+
+let signatureDetail = "";
+const analyseAffichee = {};   // pid -> série, coupe, ROI du dernier résultat affiché
+function detail() {
+  const x = etat.resultats.find(r => r.ID === patientActif);
+  const d = DETAIL || $("#detail");
+  if (x && !d.closest("tr.ligneDetail")) { d.classList.add("cache"); return; }   // patient masqué par le filtre
+  if (!x) { d.classList.add("cache"); signatureDetail = ""; return; }
+  d.classList.remove("cache");
+  const inv = etat.inventaire[x.ID] || [];
+  const p = etat.patients.find(p => p.ID === x.ID) || {};
+  const peutRelancer = p.copie === false || p.fichiers > 0;
+  const bolus = etat.mode === "bolustrak", seg = etat.mode === "segment";
+  // Le tableau est rafraîchi chaque seconde pendant l'analyse : on ne redessine
+  // ce panneau que si CE patient a changé, sinon la série cochée s'effaçait.
+  const sig = JSON.stringify([x, inv, peutRelancer]);
+  if (sig === signatureDetail) return;
+  signatureDetail = sig;
+  d.innerHTML = `
+    <h2>${esc(x.ID)} ${x.code_pseudo ? `<small>${esc(x.code_pseudo)}</small>` : ""} ${badge(x.statut)}</h2>
+    <div class="rangee" style="margin:0 0 6px"><label for="commentaire"><b>Commentaire :</b></label>
+      <input type="text" id="commentaire" maxlength="500" style="flex:1;min-width:240px" value="${esc(x.commentaire || "")}"
+        placeholder="ex. bolus raté, artefact respiratoire, mauvaise coupe… (enregistré en quittant le champ ou avec Entrée)">
+      <small id="infoCommentaire"></small></div>
+    <div class="message">${seg ? `<b>Export Segment :</b> ${esc(x.fichier_export || "–")} · <b>RR :</b> ${esc(x.source_RR || "–")}` : `<b>Choix de la série :</b> ${esc(x.choix_serie || "–")}`}
+      ${x.serie_description ? `<br><b>Série retenue :</b> ${esc(x.serie_num)} « ${esc(x.serie_description)} »` + (bolus ? `, ${esc(x.n_images)} images sur ${nb(x.duree_serie_s, 1)} s` : `, coupe ${esc(x.coupe_retenue)} / ${esc(x.n_coupes_serie)}`) : ""}
+      ${x.source_temps ? `<br><b>Temps :</b> ${esc(x.source_temps)}` + (bolus ? "" : ` · <b>RR :</b> ${esc(x.source_RR || "–")}`) : ""}
+      ${x.n_fichiers_lus ? `<br><b>Durée :</b> lecture de ${x.n_fichiers_lus} fichiers DICOM ${nb(x.duree_entetes_s, 1)} s, calcul ${nb(x.duree_calcul_s, 1)} s` : ""}
+      ${x.choix_manuel ? `<br><b>Choix manuel :</b> ${esc(x.choix_manuel)}` : ""}
+      ${x.alertes ? `<br><b>Alertes :</b> ${esc(x.alertes)}` : ""}
+      ${x.message && x.statut !== "ok" && x.statut !== "à vérifier" ? `<br><b>Message :</b> ${esc(x.message)}` : ""}</div>
+    ${x.PTT_pic_s != null || x.PTT_pied_s != null ? `<img onerror="this.remove()" alt="Image de contrôle ${esc(x.ID)}" src="/api/png?lot=${lot}&patient=${encodeURIComponent(x.ID)}&t=${Date.now()}">` : ""}
+    <div class="${seg ? "cache" : ""}"><h2 style="margin-top:16px">Séries trouvées</h2>
+    <div class="defile"><table><thead><tr><th></th><th>N° série</th><th>Description</th><th>Coupes</th><th>Images / coupe</th><th>Heure par image</th></tr></thead>
+    <tbody>${inv.map(s => `<tr><td><input type="radio" name="serieChoisie" value="${s.SeriesNumber}" ${s.SeriesNumber == x.serie_num ? "checked" : ""}></td>
+      <td>${s.SeriesNumber}</td><td>${esc(s.SeriesDescription)}${s.auto ? " <small>(choix automatique)</small>" : ""}</td>
+      <td class="n">${s.n_coupes}</td><td class="n">${s.images_par_coupe}</td><td>${s.heure_presente ? "oui" : "NON"}</td></tr>`).join("")}</tbody></table></div>
+    <div class="rangee">
+      <span class="${bolus ? "cache" : ""}">Coupe (1 = première, vide = automatique) :</span><input type="number" id="coupeChoisie" min="1" class="${bolus ? "cache" : ""}">
+      <button class="principal" id="btnRelancer" ${peutRelancer ? "" : "disabled"}>Relancer ce patient avec ce choix</button>
+      <button id="btnAuto" ${peutRelancer ? "" : "disabled"}>Relancer en automatique</button>
+    </div></div>
+    ${seg ? `<div class="rangee"><b>Fenêtre analysée</b> de <input type="number" id="segDeb" step="0.1" style="width:80px"> s
+      à <input type="number" id="segFin" step="0.1" style="width:80px"> s
+      <small>(vide = automatique ; actuelle : ${esc(x.fenetre_analyse_s || "?")} s)</small></div>
+    <div class="rangee"><button id="btnSeg" ${peutRelancer ? "" : "disabled"}>Recalculer ce patient</button>
+      <small>Après avoir modifié son export dans Segment (même nom de fichier, même emplacement).</small></div>` : ""}
+    ${peutRelancer ? "" : "<small>Les copies DICOM de ce patient ont été effacées : redéposez-le pour le relancer.</small>"}
+    ${bolus || seg ? "" : `<h2 style="margin-top:18px">Corriger les ROI à la main</h2>
+    <div class="rangee"><button id="btnRoi" ${peutRelancer ? "" : "disabled"}>Ouvrir l'éditeur de ROI</button>
+      <small>Série cochée ci-dessus (ou série retenue), coupe indiquée ci-dessus (ou coupe retenue).</small></div>
+    <div id="editeurRoi" class="cache">
+      <div class="rangee">
+        <label>Coupe <select id="roiCoupe"></select></label>
+        <label>Image <input type="range" id="roiImage" min="0" value="0"></label><span id="roiInfo" class="sous"></span>
+      </div>
+      <div class="rangee"><b>Dessiner :</b>
+        <label><input type="radio" name="roiCible" value="vd" checked> VD (bleu)</label>
+        <label><input type="radio" name="roiCible" value="vg"> VG (rouge)</label>
+        <small>Cliquez au centre de la cavité (et faites glisser pour régler la taille). Choisissez une image où la cavité est bien blanche, et restez à distance du myocarde.</small>
+      </div>
+      ${["vd", "vg"].map(k => `<div class="rangee"><b style="color:${k === "vd" ? "#00bfff" : "#ff3030"}">Taille ROI ${k.toUpperCase()} :</b>
+        <button class="roiMoins" data-k="${k}" title="Réduire la ROI ${k.toUpperCase()}">−</button>
+        <input type="range" class="roiTaille" data-k="${k}" min="1.5" max="20" step="0.5" style="width:160px">
+        <button class="roiPlus" data-k="${k}" title="Agrandir la ROI ${k.toUpperCase()}">+</button>
+        <span class="roiTailleTxt sous" data-k="${k}"></span></div>`).join("")}
+      <div class="rangee"><button id="roiTailleAuto" title="Les deux ROI reprennent la taille commune donnée par le programme">Taille par défaut (VD = VG)</button></div>
+      <div class="rangee"><b>Fenêtre analysée :</b> de <input type="number" id="fenDeb" step="0.1" style="width:80px"> s
+        à <input type="number" id="fenFin" step="0.1" style="width:80px"> s
+        <button id="fenAuto">Fenêtre automatique</button>
+        <small>Ou cliquez sur le graphique : la limite la plus proche s'y place. Les zones grisées ne sont pas utilisées.</small></div>
+      <div class="roiZone"><canvas id="roiImg" width="10" height="10"></canvas><canvas id="roiCourbes" width="520" height="330" style="cursor:col-resize"></canvas></div>
+      <div class="rangee"><span id="roiPtt"></span>
+        <button class="principal" id="btnRoiCalc">Recalculer ce patient avec ces réglages</button>
+        <button id="btnRoiFermer">Fermer l'éditeur</button></div>
+    </div>`}`;
+  $("#btnRelancer").onclick = () => {
+    const s = document.querySelector("input[name=serieChoisie]:checked");
+    if (!s) return alert("Cochez d'abord la série à analyser dans la liste.");
+    const choix = {}; choix[x.ID] = {serie: s ? s.value : "", coupe: $("#coupeChoisie").value};
+    relancer({patients: [x.ID], choix});
+  };
+  $("#btnAuto").onclick = () => relancer({patients: [x.ID]});
+  const champ = $("#commentaire");
+  const enregistrerCommentaire = async () => {
+    const texte = champ.value.trim();
+    if (texte === (x.commentaire || "")) return;
+    try {
+      await api("/api/commenter", {lot, patient: x.ID, texte});
+      x.commentaire = texte || undefined; $("#infoCommentaire").textContent = "enregistré";
+      etat = await api(`/api/etat?lot=${lot}`); afficher();
+    } catch (e) { alert(e.message); }
+  };
+  champ.onchange = enregistrerCommentaire;
+  champ.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); champ.blur(); } };
+  if (seg) $("#btnSeg").onclick = () => {
+    const f = [$("#segDeb").value, $("#segFin").value].map(v => v === "" ? null : Number(v));
+    const choix = {}; if (f[0] !== null || f[1] !== null) choix[x.ID] = {fenetre: f};
+    relancer({patients: [x.ID], choix});
+  };
+  if (bolus || seg) return;
+  $("#btnRoi").onclick = () => {
+    const sc = document.querySelector("input[name=serieChoisie]:checked");
+    const serie = sc ? Number(sc.value) : (x._roi ? x._roi.serie : x.serie_num);
+    if (!serie) return alert("Cochez d'abord la série de perfusion dans la liste.");
+    ouvrirRoi(x, serie, Number($("#coupeChoisie").value) || (x._roi && x._roi.serie === serie ? x._roi.coupe : 1));
+  };
+  // l'éditeur reste ouvert quand le panneau est redessiné (après un recalcul)
+  // nouveau résultat sur une autre série ou une autre coupe (relance avec un
+  // autre choix) : l'éditeur passe sur la série / coupe effectivement analysée
+  const ret = x._roi ? [x._roi.serie, x._roi.coupe] : (x.serie_num ? [Number(x.serie_num), Number(x.coupe_retenue) || 1] : null);
+  // (aussi après « Relancer en automatique » : les ROI et la fenêtre manuelles disparaissent de l'éditeur)
+  const cle = JSON.stringify([ret, x._roi || null, x.ROI || null]), cleAvant = analyseAffichee[x.ID];
+  analyseAffichee[x.ID] = cle;
+  if (roi && roi.pid === x.ID && ret && cleAvant && cleAvant !== cle) { roi = null; ouvrirRoi(x, ret[0], ret[1]); }
+  else if (roi && roi.pid === x.ID) ouvrirRoi(x, roi.serie, roi.coupe, true);
+  else if (peutRelancer && (x._roi || x.serie_num)) $("#btnRoi").click();   // ouverture automatique
+}
+
+/* ---------- éditeur de ROI ---------- */
+let roi = null;   // {pid, serie, coupe, donnees, image, vd, vg}
+async function ouvrirRoi(x, serie, coupe, garder) {
+  const ancien = roi && roi.pid === x.ID && roi.serie === serie && roi.coupe === coupe ? roi : null;
+  const auto = x._roi && x._roi.serie === serie && x._roi.coupe === coupe ? x._roi : null;
+  roi = {pid: x.ID, serie, coupe, donnees: ancien ? ancien.donnees : null,
+         image: ancien ? ancien.image : (auto ? auto.image : null),
+         vd: garder && ancien ? ancien.vd : (auto ? auto.vd : null),
+         vg: garder && ancien ? ancien.vg : (auto ? auto.vg : null)};
+  // taille par défaut : la même pour VD et VG (celle du programme) ; réglable ensuite pour chacune
+  roi.rDefaut = auto ? Math.min(auto.vd[2], auto.vg[2]) : 4;
+  roi.fen = garder && ancien ? ancien.fen : (auto && auto.fenetre ? [...auto.fenetre] : null);   // null = automatique
+  roi.roiModifiees = garder && ancien ? ancien.roiModifiees : x.ROI === "manuelles";
+  roi.r = {};
+  for (const k of ["vd", "vg"]) {
+    roi.r[k] = roi[k] ? roi[k][2] : roi.rDefaut;
+    if (roi[k]) roi[k] = [...roi[k]];
+  }
+  $("#editeurRoi").classList.remove("cache");
+  $("#btnRoi").classList.add("cache");
+  if (!roi.donnees) {
+    $("#roiInfo").textContent = "chargement des images…";
+    try {
+      roi.donnees = await api("/api/roi_images", {lot, patient: x.ID, serie, coupe, vd: roi.vd, vg: roi.vg, fenetre: roi.fen});
+    } catch (e) { $("#roiInfo").textContent = ""; alert(e.message); fermerRoi(); return; }
+    const bin = atob(roi.donnees.gris), g8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) g8[i] = bin.charCodeAt(i);
+    roi.donnees.g8 = g8; roi.donnees.cadres = [];
+  }
+  const d = roi.donnees;
+  if (roi.image === null) roi.image = Math.min(d.fin - 1, d.n_images - 1) >> 1;
+  $("#roiCoupe").innerHTML = Array.from({length: d.n_coupes}, (_, i) => `<option value="${i + 1}" ${i + 1 === coupe ? "selected" : ""}>${i + 1} / ${d.n_coupes}</option>`).join("");
+  $("#roiCoupe").onchange = e => ouvrirRoi(x, serie, Number(e.target.value));
+  $("#roiImage").max = d.n_images - 1;
+  $("#roiImage").value = roi.image;
+  $("#roiImage").oninput = e => { roi.image = Number(e.target.value); dessinerRoi(); };
+  const cv = $("#roiImg"), ech = Math.max(1, Math.floor(480 / Math.max(d.largeur, d.hauteur)));
+  cv.width = d.largeur * ech; cv.height = d.hauteur * ech; roi.ech = ech;
+  let enCours = null;
+  const pixel = e => { const r = cv.getBoundingClientRect();
+    return [(e.clientY - r.top) * cv.height / r.height / ech - 0.5, (e.clientX - r.left) * cv.width / r.width / ech - 0.5]; };
+  let glisse = false;
+  cv.onpointerdown = e => { cv.setPointerCapture(e.pointerId); const [y, xx] = pixel(e); glisse = false; roi.roiModifiees = true;
+    enCours = document.querySelector("input[name=roiCible]:checked").value; roi[enCours] = [y, xx, roi.r[enCours]]; dessinerRoi(); };
+  cv.onpointermove = e => { if (!enCours) return; const [y, xx] = pixel(e), c = roi[enCours];
+    const r = Math.hypot(y - c[0], xx - c[1]); if (r < 1.5 && !glisse) return;
+    glisse = true; tailleRoi(enCours, Math.max(1.5, r)); };
+  cv.onpointerup = () => { if (!enCours) return;
+    roi[enCours] = roi[enCours].map(v => Math.round(v * 10) / 10);
+    tailleRoi(enCours, roi[enCours][2]);
+    if (enCours === "vd" && !roi.vg) document.querySelector("input[name=roiCible][value=vg]").checked = true;
+    enCours = null; courbesRoi(); };
+  document.querySelectorAll(".roiTaille").forEach(el => {
+    el.oninput = e => { roi.roiModifiees = true; tailleRoi(el.dataset.k, Number(e.target.value)); };
+    el.onchange = () => courbesRoiBientot(); });
+  document.querySelectorAll(".roiMoins").forEach(el => el.onclick = () => { roi.roiModifiees = true; tailleRoi(el.dataset.k, roi.r[el.dataset.k] - 0.5); courbesRoiBientot(); });
+  document.querySelectorAll(".roiPlus").forEach(el => el.onclick = () => { roi.roiModifiees = true; tailleRoi(el.dataset.k, roi.r[el.dataset.k] + 0.5); courbesRoiBientot(); });
+  $("#roiTailleAuto").onclick = () => { roi.roiModifiees = true; tailleRoi("vd", roi.rDefaut); tailleRoi("vg", roi.rDefaut); courbesRoiBientot(); };
+  tailleRoi("vd", roi.r.vd); tailleRoi("vg", roi.r.vg);
+  $("#btnRoiFermer").onclick = fermerRoi;
+  $("#btnRoiCalc").onclick = () => {
+    if (!roi.vd || !roi.vg) return alert("Dessinez les deux ROI (VD en bleu et VG en rouge).");
+    const choix = {}; choix[x.ID] = {serie: roi.serie, coupe: roi.coupe, fenetre: roi.fen};
+    if (roi.roiModifiees) choix[x.ID].roi = {vd: roi.vd, vg: roi.vg};   // sinon ROI automatiques
+    $("#btnRoiCalc").disabled = true;
+    $("#btnRoiCalc").textContent = etat && etat.etat === "en_cours" ? "Recalcul prévu juste après le patient en cours…" : "Recalcul en cours…";
+    relancer({patients: [x.ID], choix});
+  };
+  const majFen = () => { const a = $("#fenDeb").value, b = $("#fenFin").value;
+    roi.fen = a === "" && b === "" ? null : [a === "" ? null : Number(a), b === "" ? null : Number(b)]; courbesRoiBientot(); };
+  $("#fenDeb").onchange = majFen; $("#fenFin").onchange = majFen;
+  $("#fenAuto").onclick = () => { roi.fen = null; courbesRoi(); };
+  $("#roiCourbes").onclick = e => {
+    const r = roi && roi.derniere; if (!r || !r.X) return;
+    const b = e.target.getBoundingClientRect(), px = (e.clientX - b.left) * e.target.width / b.width;
+    const tc = r.Xinv(px), tDeb = r.t[r.debut], tFin = r.t[r.fin - 1];
+    roi.fen = Math.abs(tc - tDeb) < Math.abs(tc - tFin) ? [tc, tFin] : [tDeb, tc];
+    roi.fen = roi.fen.map(v => Math.round(v * 10) / 10);
+    courbesRoi();
+  };
+  dessinerRoi();
+  courbesRoi(ancien || roi.fen ? null : d);
+}
+function cadre(d, i) {   // image i en niveaux de gris, dessinée une fois puis gardée
+  if (d.cadres[i]) return d.cadres[i];
+  const w = d.largeur, h = d.hauteur, c = document.createElement("canvas"); c.width = w; c.height = h;
+  const ctx = c.getContext("2d"), im = ctx.createImageData(w, h), src = d.g8, o = i * w * h;
+  for (let k = 0; k < w * h; k++) { const v = src[o + k]; im.data[4 * k] = im.data[4 * k + 1] = im.data[4 * k + 2] = v; im.data[4 * k + 3] = 255; }
+  ctx.putImageData(im, 0, 0);
+  return d.cadres[i] = c;
+}
+function tailleRoi(k, r) {   // rayon de la ROI k ("vd" ou "vg"), réglé indépendamment
+  if (!roi) return;
+  const v = Math.round(Math.min(20, Math.max(1.5, r)) * 10) / 10;
+  roi.r[k] = v;
+  if (roi[k]) roi[k][2] = v;
+  const t = document.querySelector(`.roiTaille[data-k=${k}]`); if (t) t.value = v;
+  const mm = roi.donnees && roi.donnees.mm_px;
+  const txt = document.querySelector(`.roiTailleTxt[data-k=${k}]`);
+  if (txt) txt.textContent = `rayon ${nb(v, 1)} pixels` + (mm ? ` (${nb(v * mm, 1)} mm, diamètre ${nb(2 * v * mm, 0)} mm)` : "")
+    + (Math.abs(v - roi.rDefaut) < 0.05 ? " · taille par défaut" : "");
+  dessinerRoi();
+}
+let _minuteurCourbes = null;
+function courbesRoiBientot() { clearTimeout(_minuteurCourbes); _minuteurCourbes = setTimeout(() => courbesRoi(), 250); }
+function fermerRoi() {
+  roi = null;
+  $("#editeurRoi").classList.add("cache");
+  $("#btnRoi").classList.remove("cache");
+}
+function dessinerRoi() {
+  if (!roi || !roi.donnees || !roi.donnees.g8) return;
+  const d = roi.donnees, cv = $("#roiImg"), g = cv.getContext("2d"), ech = roi.ech, im = cadre(d, roi.image);
+  g.imageSmoothingEnabled = false;
+  g.fillStyle = "#000"; g.fillRect(0, 0, cv.width, cv.height);
+  g.drawImage(im, 0, 0, cv.width, cv.height);
+  for (const [k, col] of [["vd", "#00bfff"], ["vg", "#ff3030"]]) {
+    const c = roi[k]; if (!c) continue;
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath();
+    g.arc((c[1] + 0.5) * ech, (c[0] + 0.5) * ech, c[2] * ech, 0, 2 * Math.PI); g.stroke();
+  }
+  const t = d.t[roi.image];
+  $("#roiInfo").textContent = `image ${roi.image + 1} / ${d.n_images}` + (d.unite === "s" ? ` · ${nb(t, 1)} s` : "")
+    + (roi.image >= d.fin ? " · hors premier passage" : "");
+}
+async function courbesRoi(deja) {
+  if (!roi) return;
+  let r = deja;
+  if (!r || (roi.vd && !r.vd) || (roi.vg && !r.vg) || roi.fen) {
+    try { r = await api("/api/roi_courbes", {lot, patient: roi.pid, serie: roi.serie, coupe: roi.coupe, vd: roi.vd, vg: roi.vg, fenetre: roi.fen}); }
+    catch (e) { $("#roiPtt").textContent = e.message; return; }
+  }
+  if (!roi) return;
+  const cv = $("#roiCourbes"), g = cv.getContext("2d"), W = cv.width, Hh = cv.height, m = {g: 52, d: 12, h: 14, b: 34};
+  const st = getComputedStyle(document.body), texte = st.getPropertyValue("--texte"), doux = st.getPropertyValue("--doux");
+  g.clearRect(0, 0, W, Hh);
+  const t = r.t, ys = [...(r.vd || []), ...(r.vg || []), 0];
+  const t0 = t[0], t1 = t[t.length - 1] || 1, y0 = Math.min(...ys), y1 = Math.max(...ys) || 1;
+  const X = v => m.g + (v - t0) / (t1 - t0 || 1) * (W - m.g - m.d), Y = v => Hh - m.b - (v - y0) / (y1 - y0 || 1) * (Hh - m.h - m.b);
+  if (r.fin < t.length) { g.fillStyle = "rgba(128,128,128,.18)"; g.fillRect(X(t[r.fin - 1]), m.h, X(t1) - X(t[r.fin - 1]), Hh - m.h - m.b); }
+  const deb = r.debut || 0;
+  if (deb > 0) { g.fillStyle = "rgba(128,128,128,.18)"; g.fillRect(X(t0), m.h, X(t[deb]) - X(t0), Hh - m.h - m.b); }
+  roi.derniere = {t, debut: deb, fin: r.fin, X, Xinv: px => t0 + (px - m.g) / (W - m.g - m.d) * (t1 - t0)};
+  if (document.activeElement !== $("#fenDeb")) $("#fenDeb").value = Math.round(t[deb] * 10) / 10;
+  if (document.activeElement !== $("#fenFin")) $("#fenFin").value = Math.round(t[r.fin - 1] * 10) / 10;
+  $("#fenAuto").textContent = roi.fen ? "Fenêtre automatique" : "Fenêtre automatique (actuelle)";
+  g.strokeStyle = doux; g.lineWidth = 1; g.beginPath(); g.moveTo(m.g, m.h); g.lineTo(m.g, Hh - m.b); g.lineTo(W - m.d, Hh - m.b); g.stroke();
+  g.fillStyle = doux; g.font = "12px system-ui"; g.textAlign = "center";
+  for (let i = 0; i <= 5; i++) { const v = t0 + i * (t1 - t0) / 5; g.fillText(nb(v, 0), X(v), Hh - m.b + 15); }
+  g.fillText(r.unite === "s" ? "temps (s)" : "n° d'image", (W + m.g) / 2, Hh - 4);
+  g.textAlign = "right"; g.fillText(nb(y1, 0), m.g - 6, m.h + 10); g.fillText(nb(y0, 0), m.g - 6, Hh - m.b);
+  for (const [k, col] of [["vd", "#00bfff"], ["vg", "#ff3030"]]) {
+    if (!r[k]) continue;
+    g.fillStyle = col; r[k].forEach((v, i) => { g.beginPath(); g.arc(X(t[i]), Y(v), 2.6, 0, 2 * Math.PI); g.fill(); });
+    if (r["pic_" + k] != null) { g.strokeStyle = col; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(X(r["pic_" + k]), m.h); g.lineTo(X(r["pic_" + k]), Hh - m.b); g.stroke(); g.setLineDash([]); }
+  }
+  g.fillStyle = texte; g.textAlign = "left";
+  $("#roiPtt").innerHTML = r.ptt_pic != null ? `<b>PTT pic (aperçu) : ${nb(r.ptt_pic, 2)} ${r.unite === "s" ? "s" : "images"}</b>` + (r.ptt_pic <= 0 ? ` <span class="erreur">VG avant VD : ROI inversées ?</span>` : "")
+    : (roi.vd && roi.vg ? "Pic non trouvé sur une des courbes" : "Dessinez la ROI " + (roi.vd ? "VG (rouge)" : "VD (bleu)"));
+}
+
+$("#btnReprendre").onclick = () => analyser({reprendre: true});
+
+/* ---------- validation ok / échec ---------- */
+async function valider(id, v) {
+  const x = etat.resultats.find(y => y.ID === id);
+  if (!x) return;
+  x.validation_manuelle = v || undefined; x.statut = v || x.statut_auto || x.statut; afficher();   // affichage immédiat
+  try { await api("/api/valider", {lot, patient: id, valeur: v}); etat = await api(`/api/etat?lot=${lot}`); afficher(); }
+  catch (e) { alert(e.message); }
+}
+const validable = x => x && (x.statut_auto === "à vérifier" || x.statut === "à vérifier" || x.validation_manuelle);
+
+/* ---------- relecture au clavier ---------- */
+function allerA(sens) {
+  if (!etat || !etat.resultats.length) return;
+  const ids = [...document.querySelectorAll("tr.res")].map(t => t.dataset.id);
+  const aVerif = ids.filter(id => (etat.resultats.find(y => y.ID === id) || {}).statut === "à vérifier");
+  $("#infoClavier").textContent = aVerif.length ? "" : "Plus aucun patient « à vérifier » : relecture terminée.";
+  if (!aVerif.length) { patientActif = null; afficher(); return; }
+  const i = ids.indexOf(patientActif);
+  const suivant = sens > 0 ? (aVerif.find(id => ids.indexOf(id) > i) || aVerif[0])
+                           : ([...aVerif].reverse().find(id => ids.indexOf(id) < i) || aVerif[aVerif.length - 1]);
+  patientActif = suivant; afficher();
+  const tr = document.querySelector(`tr.res[data-id="${CSS.escape(suivant)}"]`);
+  if (tr) tr.scrollIntoView({block: "start"});
+}
+document.addEventListener("keydown", async e => {
+  const t = e.target, tag = t.tagName;
+  if (e.ctrlKey || e.metaKey || e.altKey || tag === "TEXTAREA" || tag === "SELECT") return;
+  if (tag === "INPUT" && !["checkbox", "radio", "button"].includes(t.type)) return;   // saisie, curseur d'image
+  if (!etat || $("#resultats").classList.contains("cache")) return;
+  const k = e.key.toLowerCase();
+  if (k === "arrowright" || k === "n") { e.preventDefault(); allerA(1); }
+  else if (k === "arrowleft" || k === "p") { e.preventDefault(); allerA(-1); }
+  else if (k === "escape") { patientActif = null; afficher(); }
+  else if ((k === "o" || k === "e") && patientActif) {
+    const x = etat.resultats.find(y => y.ID === patientActif);
+    if (!validable(x)) return;
+    e.preventDefault();
+    await valider(patientActif, k === "o" ? "ok" : "échec");
+    allerA(1);
+  }
+});
+
+/* ---------- analyses précédentes ---------- */
+async function chargerLots() {
+  let j; try { j = await api("/api/lots", {}); } catch (e) { return; }
+  const l = j.lots.filter(x => x.id !== lot);
+  $("#anciens").classList.toggle("cache", !l.length);
+  $("#listeLots").innerHTML = l.map(x => `<tr><td>${esc(x.sauve_le || "")}</td><td>${x.mode === "bolustrak" ? "2D BolusTrak" : x.mode === "segment" ? "Courbes (Segment ou sauvegardées)" : "Perfusion"}</td>
+    <td class="n">${x.n_resultats} / ${x.n_patients}</td><td class="n">${x.a_verifier}</td><td><small>${esc(x.id)}</small></td>
+    <td><button data-lot="${esc(x.id)}">Rouvrir</button></td></tr>`).join("");
+  document.querySelectorAll("#listeLots button").forEach(b => b.onclick = () => rouvrir(b.dataset.lot));
+}
+async function rouvrir(id) {
+  if (etat && etat.etat === "en_cours") return alert("Attendez la fin de l'analyse en cours.");
+  let j; try { j = await api("/api/rouvrir", {id}); } catch (e) { return alert(e.message); }
+  lot = j.lot; etat = null; patientActif = null; roi = null; signatureDetail = signatureTableau = "";
+  if (j.prefixe) $("#prefixe").value = j.prefixe;
+  document.querySelector(`input[name=analyse][value=${j.mode}]`).checked = true;
+  modePrecedent = j.mode; majTypeAnalyse(j.mode);
+  suivre();
+  setTimeout(() => { chargerLots(); $("#resultats").scrollIntoView({block: "start"}); }, 600);
+}
+$("#expCsv").onclick = () => location.href = `/api/export?lot=${lot}&format=csv`;
+$("#expXlsx").onclick = () => location.href = `/api/export?lot=${lot}&format=xlsx`;
+$("#expIdentites").onclick = () => location.href = `/api/export?lot=${lot}&format=identites`;
+$("#expZip").onclick = () => location.href = `/api/export?lot=${lot}&format=zip`;
+$("#btnNouveau").onclick = async () => {
+  if (etat && etat.etat === "en_cours") return alert("Une analyse est en cours.");
+  enAttente = []; apercu(); await nouveauLot();
+};
+$("#btnEffacer").onclick = async () => {
+  if (!confirm("Supprimer les copies des DICOM déposés pour cette analyse ? Les résultats et images de contrôle sont conservés.")) return;
+  try { await api("/api/effacer_copies", {lot}); if (etat) suivre(); alert("Copies effacées."); } catch (e) { alert(e.message); }
+};
+
+nouveauLot().then(chargerLots).catch(e => alert("Le serveur ne répond pas : relancez site_ptt.py. (" + e.message + ")"));
+</script>
+</body>
+</html>
