@@ -12,7 +12,17 @@ Gardez ces fichiers **ensemble dans un même dossier** :
 - `ptt_pipeline.py` (votre pipeline, version 1.3.4 ; vous pouvez le remplacer par une version plus récente)
 - `Lancer_site_PTT.bat` (Windows) / `Lancer_site_PTT_Mac.command` (Mac)
 
-## Mises à jour automatiques (dépôt GitHub)
+## Version en ligne (rien à installer)
+**Ouvrir l'outil : https://bencardio.github.io/ptt-auto/** (Chrome ou Edge récents).
+
+- Mêmes calculs que le site local (`ptt_pipeline.py` et `site_ptt.py` chargés tels quels), exécutés **dans le navigateur** par Python (Pyodide) : les DICOM sont lus sur place, rien n'est envoyé à un serveur.
+- Toujours la dernière version : chaque modification du dépôt est en ligne quelques minutes plus tard.
+- Au premier lancement, choisissez un **dossier de travail** vide (par ex. `PTT_resultats`, pas celui des DICOM) : résultats, `pseudonymes.csv`, `prefixe_pseudo.txt` et `cliniques.xlsx` y sont enregistrés comme à côté du site local. Les fois suivantes, « Reprendre » (ou rien, si Chrome a reçu « Autoriser à chaque visite »).
+- « Choisir un dossier sur ce PC et analyser » : le navigateur demande d'autoriser la lecture du dossier ; une cohorte entière se choisit de la même façon (option « un sous-dossier par patient »). Le champ « chemin à coller » n'existe pas en ligne.
+- Plus lent que le site local (Python dans le navigateur) ; premier chargement environ 1 minute, ensuite en cache. La page reste utilisable entre deux patients.
+- Code de la version en ligne : `web/` (`pont.js` côté page, `worker.js` et `web_ptt.py` côté Python). `page_site_ptt.html` est la même page pour les deux versions.
+
+## Site local : mises à jour automatiques (dépôt GitHub)
 Le code est sur GitHub (dépôt `Bencardio/ptt-auto`). À chaque lancement par `Lancer_site_PTT.bat` ou `Lancer_site_PTT_Mac.command`, `mise_a_jour.py` télécharge la dernière version et remplace uniquement les fichiers du programme : rien à télécharger, décompresser ni autoriser.
 - Les résultats, copies DICOM, `pseudonymes.csv`, `cliniques.xlsx`, etc. ne sont jamais touchés ni envoyés : la mise à jour ne fait que **télécharger** du code.
 - Les fichiers remplacés sont gardés dans `anciennes_versions/<date_heure>/` (pour revenir en arrière, recopiez-les à côté de `site_ptt.py`).

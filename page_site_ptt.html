@@ -206,6 +206,7 @@ small{color:var(--doux)}
 </section>
 </main>
 
+<script src="web/pont.js"></script>   <!-- version en ligne seulement (vide sur le site local) -->
 <script>
 "use strict";
 const $ = s => document.querySelector(s);
@@ -622,7 +623,7 @@ function detail() {
       ${x.choix_manuel ? `<br><b>Choix manuel :</b> ${esc(x.choix_manuel)}` : ""}
       ${x.alertes ? `<br><b>Alertes :</b> ${esc(x.alertes)}` : ""}
       ${x.message && x.statut !== "ok" && x.statut !== "à vérifier" ? `<br><b>Message :</b> ${esc(x.message)}` : ""}</div>
-    ${x.PTT_pic_s != null || x.PTT_pied_s != null ? `<img onerror="this.remove()" alt="Image de contrôle ${esc(x.ID)}" src="/api/png?lot=${lot}&patient=${encodeURIComponent(x.ID)}&t=${Date.now()}">` : ""}
+    ${x.PTT_pic_s != null || x.PTT_pied_s != null ? `<img onerror="this.remove()" alt="Image de contrôle ${esc(x.ID)}" ${window.PTT_WEB ? "data-png" : "src"}="/api/png?lot=${lot}&patient=${encodeURIComponent(x.ID)}&t=${Date.now()}">` : ""}
     <div class="${seg ? "cache" : ""}"><h2 style="margin-top:16px">Séries trouvées</h2>
     <div class="defile"><table><thead><tr><th></th><th>N° série</th><th>Description</th><th>Coupes</th><th>Images / coupe</th><th>Heure par image</th></tr></thead>
     <tbody>${inv.map(s => `<tr><td><input type="radio" name="serieChoisie" value="${s.SeriesNumber}" ${s.SeriesNumber == x.serie_num ? "checked" : ""}></td>
@@ -935,10 +936,12 @@ async function rouvrir(id) {
   suivre();
   setTimeout(() => { chargerLots(); $("#resultats").scrollIntoView({block: "start"}); }, 600);
 }
-$("#expCsv").onclick = () => location.href = `/api/export?lot=${lot}&format=csv`;
-$("#expXlsx").onclick = () => location.href = `/api/export?lot=${lot}&format=xlsx`;
-$("#expIdentites").onclick = () => location.href = `/api/export?lot=${lot}&format=identites`;
-$("#expZip").onclick = () => location.href = `/api/export?lot=${lot}&format=zip`;
+// version en ligne : le fichier est fabriqué dans le navigateur puis téléchargé
+const aller = u => window.PTT_WEB ? PTT_WEB.telecharger(u) : (location.href = u);
+$("#expCsv").onclick = () => aller(`/api/export?lot=${lot}&format=csv`);
+$("#expXlsx").onclick = () => aller(`/api/export?lot=${lot}&format=xlsx`);
+$("#expIdentites").onclick = () => aller(`/api/export?lot=${lot}&format=identites`);
+$("#expZip").onclick = () => aller(`/api/export?lot=${lot}&format=zip`);
 $("#btnNouveau").onclick = async () => {
   if (etat && etat.etat === "en_cours") return alert("Une analyse est en cours.");
   enAttente = []; apercu(); await nouveauLot();

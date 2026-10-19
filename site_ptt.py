@@ -855,6 +855,8 @@ class Gestionnaire(BaseHTTPRequestHandler):
         qs = parse_qs(u.query)
         if u.path in ("/", "/index.html"):
             return self.envoyer(200, PAGE.read_bytes(), "text/html; charset=utf-8")
+        if u.path == "/web/pont.js":   # pont de la version en ligne : inutile ici
+            return self.envoyer(200, b"", "text/javascript; charset=utf-8")
         lot = lot_depuis(qs)
         if u.path == "/api/etat":
             if not lot:
