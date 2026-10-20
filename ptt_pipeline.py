@@ -85,7 +85,7 @@ except ImportError as err:  # message clair pour un utilisateur novice
     print("  python -m pip install pydicom numpy scipy pandas matplotlib openpyxl\n")
     sys.exit(1)
 
-VERSION = "1.4.7"
+VERSION = "1.4.8"
 
 # =============================================================================
 # 1. PARAMÈTRES MODIFIABLES
@@ -153,6 +153,12 @@ MOTS_STRESS = ["stress", "adeno", "regadeno", "dobu", "effort"]
 
 # Mots qui désignent explicitement une perfusion de REPOS (série à préférer).
 MOTS_REPOS = ["rest", "repos", "rust"]
+
+# Plusieurs perfusions dont l'une n'a que 3 ou 4 coupes (souvent « 3 sl » dans
+# le nom) et les autres davantage (en général 8) : on analyse celle à peu de
+# coupes, sur sa coupe du milieu (2e sur 3). False = ancien comportement.
+PREFERER_PERFUSION_PEU_DE_COUPES = True
+N_COUPES_MAX_PREFEREE = 4
 
 # S'il reste plusieurs séries dynamiques sans indication repos/stress :
 #   "derniere" = prendre la dernière acquise (le repos suit habituellement le
@@ -1073,21 +1079,43 @@ def choisir_serie(series, choix_manuel=None):
     else:
         noms_orig = {sans_orig(s["description"]) for s in origines}
         perf = origines + [s for s in derivees if sans_orig(s["description"]) not in noms_orig]
+    note = ""
+    if PREFERER_PERFUSION_PEU_DE_COUPES:
+        # perfusion à 3-4 coupes (« 3 sl ») préférée aux perfusions à 8 coupes
+        hors_stress = [s for s in perf if not contient(s["description"], MOTS_STRESS)]
+        peu = [s for s in hors_stress if peu_de_coupes(s)]
+        if peu and len(peu) < len(hors_stress):
+            perf = peu + [s for s in perf if contient(s["description"], MOTS_STRESS)]
+            note = " ; perfusion à %d coupes préférée aux perfusions à plus de coupes" % len(peu[0]["coupes"])
+            if len(peu) == 1:
+                n_autres = len(hors_stress) - 1
+                return peu[0], "série à %d coupes préférée à %d perfusion%s à plus de coupes" % (
+                    len(peu[0]["coupes"]), n_autres, "s" if n_autres > 1 else "")
     repos = [s for s in perf if contient(s["description"], MOTS_REPOS)
              and not contient(s["description"], MOTS_STRESS)]
     if len(repos) == 1:
-        return repos[0], "série de repos identifiée par son nom"
+        return repos[0], "série de repos identifiée par son nom" + note
     non_stress = [s for s in perf if not contient(s["description"], MOTS_STRESS)]
     candidats = repos or non_stress or perf
     if len(candidats) == 1:
         msg = "série unique" if len(perf) == 1 else "seule série non-stress"
-        return candidats[0], msg
+        return candidats[0], msg + note
     cle = lambda s: (s["temps_min"] if s["temps_min"] is not None else s["serie_num"])
     candidats = sorted(candidats, key=cle)
     choisi = candidats[-1] if ORDRE_SI_AMBIGU == "derniere" else candidats[0]
     choisi["_candidats"] = candidats
     return choisi, "AMBIGU : %d séries possibles, %s retenue (à vérifier)" % (
-        len(candidats), "dernière" if ORDRE_SI_AMBIGU == "derniere" else "première")
+        len(candidats), "dernière" if ORDRE_SI_AMBIGU == "derniere" else "première") + note
+
+
+def peu_de_coupes(serie):
+    """Perfusion à 3-4 coupes : nombre de coupes, ou « 3 sl » / « 4sl » dans le nom."""
+    import re
+    n = len(serie.get("coupes") or {}) or serie.get("n_coupes") or 0
+    if 3 <= n <= N_COUPES_MAX_PREFEREE:
+        return True
+    return n <= N_COUPES_MAX_PREFEREE and bool(
+        re.search(r"(?<!\d)[34]\s*(sl|slices?|coupes?)\b", str(serie.get("description", "")).lower()))
 
 
 def rehaussement_serie(serie):
@@ -1570,6 +1598,12 @@ def analyser_patient(id_patient, dossier, clin, choix, dossier_png):
 
     positions = sorted(serie["coupes"].keys())
     ordre = list(range(len(positions)))
+    coupe_milieu = None
+    if PREFERER_PERFUSION_PEU_DE_COUPES and not choix_coupe and 3 <= len(positions) <= N_COUPES_MAX_PREFEREE:
+        # perfusion à 3-4 coupes : la coupe du milieu (2 sur 3) est analysée en
+        # premier et retenue dès qu'elle est exploitable
+        coupe_milieu = (len(positions) - 1) // 2
+        ordre = [coupe_milieu] + [k for k in ordre if k != coupe_milieu]
     if choix_coupe:
         if 1 <= choix_coupe <= len(positions):
             ordre = [choix_coupe - 1]
@@ -1667,6 +1701,16 @@ def analyser_patient(id_patient, dossier, clin, choix, dossier_png):
                     y_vd=y_vd, y_vg=y_vg, a_vd=a_vd, a_vg=a_vg, score=score)
         if meilleur is None or cand["score"] > meilleur["score"]:
             meilleur = cand
+        if k == coupe_milieu:
+            break       # coupe du milieu exploitable : c'est elle qu'on garde
+    if coupe_milieu is not None and meilleur is not None:
+        if meilleur["k"] == coupe_milieu:
+            ligne["choix_serie"] = (ligne.get("choix_serie") or "") + " ; coupe du milieu (%d/%d)" % (
+                coupe_milieu + 1, len(positions))
+        else:
+            ligne["choix_serie"] = (ligne.get("choix_serie") or "") + (
+                " ; coupe du milieu (%d/%d) inexploitable, coupe %d retenue" % (
+                    coupe_milieu + 1, len(positions), meilleur["k"] + 1))
     if meilleur is None:
         ligne["message"] = " ; ".join(raisons) or "aucune coupe exploitable"
         return ligne
